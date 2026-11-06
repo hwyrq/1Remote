@@ -84,6 +84,10 @@ namespace _1RM.Service
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
         public bool TabWindowCloseButtonOnLeft = false;
 
+        [DefaultValue(true)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
+        public bool TabWindowShowTitleBar = true;
+
 
         [DefaultValue(false)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]

@@ -248,7 +248,8 @@ namespace _1RM.View.Host
                 double border1 = withoutBorderColor ? tabContentBorderWithOutColor.Left + tabContentBorderWithOutColor.Right : tabContentBorderWithColor.Left + tabContentBorderWithColor.Right;
                 double border2 = withoutBorderColor ? tabContentBorderWithOutColor.Top + tabContentBorderWithOutColor.Bottom : tabContentBorderWithColor.Top + tabContentBorderWithColor.Bottom;
                 size.Width = actualWidth - border1;
-                size.Height = actualHeight - TITLE_BAR_HEIGHT - border2;
+                double titleBarHeight = TabablzControl.IsHeaderPanelVisible ? TITLE_BAR_HEIGHT : 0;
+                size.Height = Math.Max(0, actualHeight - titleBarHeight - border2);
             });
             return size;
         }

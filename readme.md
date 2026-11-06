@@ -1,5 +1,20 @@
 # 1Remote
 
+## 当前版本说明
+
+基于官方 tag [1.3.1](https://github.com/1Remote/1Remote/tree/1.3.1)，当前分支为 `feature/session-titlebar-toggle`。
+
+新增会话窗口标题栏开关：
+
+- **位置**：主窗口搜索框右侧、菜单按钮左侧。
+- **功能**：一键显示或隐藏所有会话窗口的连接标签栏及窗口按钮，隐藏后增加会话内容的可用空间。
+- **状态**：设置自动保存，新会话继承当前状态；图标带斜线表示已隐藏，再次点击即可恢复显示。
+- **操作**：通过按钮切换，无需快捷键，保持普通窗口模式。
+
+本地构建、验证和打包方式见[构建说明](docs/titlebar-build.md)。
+
+---
+
 English | [中文](https://github.com/1Remote/1Remote/wiki/Intro%E2%80%90ZhCn)
 
 [![version](https://img.shields.io/github/v/release/1Remote/1Remote?color=Green&include_prereleases)](https://github.com/1Remote/1Remote/releases)

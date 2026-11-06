@@ -441,6 +441,7 @@
 
     <Grid Background="{DynamicResource PrimaryMidBrush}">
         <dragablz:TabablzControl x:Name="TabablzControl"
+                                 IsHeaderPanelVisible="{Binding SettingsPage.GeneralSettingViewModel.TabWindowShowTitleBar}"
                                  BorderThickness="0"
                                  Margin="0" Padding="0"
                                  Background="{DynamicResource PrimaryMidBrush}"
@@ -460,7 +461,8 @@
 
 
         <!-- Function buttons -->
-        <StackPanel VerticalAlignment="Top">
+        <StackPanel VerticalAlignment="Top"
+                    Visibility="{Binding SettingsPage.GeneralSettingViewModel.TabWindowShowTitleBar, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel.Style>
                 <Style TargetType="StackPanel">
                     <Setter Property="Orientation" Value="Horizontal" />

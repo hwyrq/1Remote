@@ -1,0 +1,5 @@
+<Project>
+  <!-- Local builds keep the upstream placeholders instead of maintainer secrets. -->
+  <Target Name="PreBuild" />
+  <Target Name="PostBuild" />
+</Project>
