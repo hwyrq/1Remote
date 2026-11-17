@@ -1,4 +1,4 @@
-# 会话窗口标题栏开关
+# 会话窗口标题栏与标题后缀开关
 
 本改动基于 `1.3.1` 标签（`d9dd7fa98cb914d5ee112acc860bf557b66975e9`），
 维护分支为 `feature/session-titlebar-toggle`。
@@ -6,6 +6,13 @@
 主窗口搜索框右侧、菜单左侧的窗口图标用于显示或隐藏所有会话窗口的标题栏。
 带斜线表示已隐藏。设置会自动保存，新会话继承当前状态，没有新增快捷键。
 旧配置缺少该设置时保持标题栏可见；完整便携包的初始配置设为隐藏。
+
+旁边带 `T` 的窗口图标控制会话窗口标题中自动追加的 ` - 1Remote` 后缀。
+关闭后，`code - 1Remote` 变为 `code`，连接名称始终保留；开启后恢复后缀。
+全屏窗口原本没有自动追加的应用名后缀，其原有标题保持不变。
+这两个开关独立生效，状态自动保存，新建窗口也会继承当前状态；没有新增快捷键。
+旧配置和完整便携包默认显示后缀，点击新按钮即可隐藏。
+此前已关闭标题文字的配置可以直接沿用，更新后会保留连接名称，无需重置配置。
 
 ## 构建
 
@@ -22,8 +29,10 @@ NuGet 包缓存目录。缓存作为只读包源使用，构建写入 `artifacts
 构建使用仓库原有的占位参数，与此前交付的自编译版本保持一致。
 
 产物位于 `artifacts/1Remote`，包含 .NET 10 运行时。`-Verify` 会使用独立测试配置运行
-18 项 WPF 交互检查，输出到 `artifacts/qa`，包括检查日志及显示、隐藏状态的按钮渲染。
-检查覆盖实际编译的主窗口、会话视图、双向绑定、多窗口同步、状态保存及内容布局。
+WPF 交互检查，输出到 `artifacts/qa`，包括检查日志及显示、隐藏状态的按钮渲染。
+检查覆盖实际编译的主窗口、会话视图、双向绑定、多窗口同步、状态保存及内容布局，
+并通过 Windows 原生窗口接口验证 `code - 1Remote` 与 `code` 的切换、全屏标题保留、
+新窗口、改名和切换标签后的行为，以及连接名自身含 ` - 1Remote` 时仍完整保留。
 测试中设置页内容为空白占位，不连接远程主机。
 
 ## 打包和更新
@@ -35,6 +44,8 @@ python .\scripts\Package-Titlebar.py
 ```
 
 完整便携包、源码差异、构建信息及 SHA-256 清单输出到 `artifacts/dist`。
+可用 `--output` 指定新的产物目录，`--prefix` 指定新的文件名前缀，保留已发布的旧包。
+构建信息记录源码提交、工作区是否存在未提交改动、补丁校验值和本次通过的检查数量。
 如需生成前一个自编译版本的增量更新包，同时指定其发布目录与源码目录：
 
 ```powershell
@@ -51,13 +62,14 @@ python .\scripts\Package-Titlebar.py --previous-publish '<之前的发布目录>
 
 ## 文件范围
 
-功能修改仅涉及以下 7 个文件，子模块指针保持 `1.3.1` 标签中的版本：
+功能修改涉及以下 8 个文件，子模块指针保持 `1.3.1` 标签中的版本：
 
 - `Ui/Resources/Languages/en-us.xaml`
 - `Ui/Resources/Languages/zh-cn.xaml`
 - `Ui/Service/ConfigurationService.cs`
 - `Ui/View/Host/TabWindowView.xaml`
 - `Ui/View/Host/TabWindowView.xaml.cs`
+- `Ui/View/Host/TabWindowViewModel.cs`
 - `Ui/View/MainWindowView.xaml`
 - `Ui/View/Settings/General/GeneralSettingViewModel.cs`
 

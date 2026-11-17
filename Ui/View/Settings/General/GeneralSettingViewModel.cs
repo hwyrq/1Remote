@@ -166,6 +166,18 @@ namespace _1RM.View.Settings.General
             }
         }
 
+        public bool TabWindowShowWindowTitle
+        {
+            get => _configurationService.General.TabWindowShowWindowTitle;
+            set
+            {
+                if (SetAndNotifyIfChanged(ref _configurationService.General.TabWindowShowWindowTitle, value))
+                {
+                    _configurationService.Save();
+                }
+            }
+        }
+
         public bool TabWindowSetFocusToLocalDesktopOnMouseLeaveRdpWindow
         {
             get => _configurationService.General.TabWindowSetFocusToLocalDesktopOnMouseLeaveRdpWindow;

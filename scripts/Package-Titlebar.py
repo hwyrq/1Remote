@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import difflib
 import hashlib
 import json
+import re
 from pathlib import Path
 import subprocess
 import zipfile
@@ -17,6 +18,7 @@ CHANGE_PATHS = [
     'Ui/Service/ConfigurationService.cs',
     'Ui/View/Host/TabWindowView.xaml',
     'Ui/View/Host/TabWindowView.xaml.cs',
+    'Ui/View/Host/TabWindowViewModel.cs',
     'Ui/View/MainWindowView.xaml',
     'Ui/View/Settings/General/GeneralSettingViewModel.cs',
     'readme.md',
@@ -69,17 +71,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--previous-publish', type=Path)
     parser.add_argument('--previous-source', type=Path)
+    parser.add_argument('--output', type=Path, help='Delivery directory; defaults to artifacts/dist.')
+    parser.add_argument('--prefix', default=PREFIX, help='Filename prefix for the delivery.')
     args = parser.parse_args()
     if bool(args.previous_publish) != bool(args.previous_source):
         parser.error('Specify both --previous-publish and --previous-source for an update.')
 
     artifacts = ROOT / 'artifacts'
     publish = artifacts / '1Remote'
-    out = artifacts / 'dist'
+    out = args.output.resolve() if args.output else artifacts / 'dist'
+    prefix = args.prefix
+    if not prefix or '/' in prefix or '\\' in prefix:
+        parser.error('--prefix must be a filename prefix without directory separators.')
     out.mkdir(parents=True, exist_ok=True)
     proof_path = artifacts / 'qa/verification.log'
     proof = proof_path.read_text(encoding='utf-8-sig')
-    if 'SUCCESS: 18 checks passed' not in proof:
+    checks = re.findall(r'^SUCCESS: (\d+) checks passed$', proof, re.MULTILINE)
+    if not checks or int(checks[-1]) <= 0:
         raise ValueError('Run Build-Titlebar.ps1 -Verify successfully before packaging.')
     files = {p.relative_to(publish).as_posix(): p.read_bytes()
              for p in publish.rglob('*') if p.is_file()}
@@ -91,16 +99,20 @@ def main():
            or '.db-' in name.lower() for name in files):
         raise ValueError('The publish directory contains user data.')
 
+    patch_bytes = create_patch()
     info = {
         'upstreamTag': '1.3.1',
         'sourceCommit': git('rev-parse', 'HEAD').decode().strip(),
         'sourceBranch': git('branch', '--show-current').decode().strip(),
+        'sourceDirty': bool(git('status', '--porcelain', '--untracked-files=all').strip()),
+        'sourcePatchSha256': sha(patch_bytes),
         'submodules': git('submodule', 'status').decode().splitlines(),
         'builtAtUtc': datetime.now(timezone.utc).isoformat(),
         'target': 'net10.0-windows10.0.19041.0 / win-x64 / self-contained',
         'titlebarControl': 'Main window, after search box and before menu',
         'titlebarShortcut': None,
-        'smokeChecksPassed': 18,
+        'windowTitleControl': '1Remote suffix toggle in the main window, beside the session title bar switch',
+        'smokeChecksPassed': int(checks[-1]),
         'liveRdpTested': False,
         'executableSha256': sha(files['1Remote.exe']),
         'assemblySha256': sha(files['1Remote.dll']),
@@ -120,23 +132,24 @@ def main():
         changed = {name: data for name, data in files.items()
                    if not (args.previous_publish / name).is_file()
                    or sha(data) != sha((args.previous_publish / name).read_bytes())}
-        update = out / f'{PREFIX}-update.zip'
+        update = out / f'{prefix}-update.zip'
         archive(update, {**changed, **common})
         deliveries.append(update)
         print('Updated program files:', ', '.join(sorted(changed)))
 
     profile = {'General': {'CurrentLanguageCode': 'zh-cn', 'TabWindowShowTitleBar': False,
+                           'TabWindowShowWindowTitle': True,
                            'DoNotCheckNewVersion': True}}
     portable = {**files, **common,
                 '1Remote.json': (json.dumps(profile, ensure_ascii=False, indent=2) + '\n').encode('utf-8'),
                 'FORCE_INTO_PORTABLE_MODE': b'Portable profile\n'}
-    full = out / f'{PREFIX}-win-x64.zip'
+    full = out / f'{prefix}-win-x64.zip'
     archive(full, {'1Remote-titlebar/' + name: data for name, data in portable.items()})
     deliveries.append(full)
 
-    patch_path = out / f'{PREFIX}.patch'
+    patch_path = out / f'{prefix}.patch'
     with patch_path.open('xb') as patch_file:
-        patch_file.write(create_patch())
+        patch_file.write(patch_bytes)
     git('apply', '--reverse', '--check', str(patch_path))
     deliveries.append(patch_path)
     (out / 'BUILD-INFO.json').write_bytes(common['BUILD-INFO.json'])

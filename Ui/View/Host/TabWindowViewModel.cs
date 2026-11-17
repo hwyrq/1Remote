@@ -12,6 +12,7 @@ using _1RM.Utils;
 using _1RM.Utils.WindowsApi;
 using _1RM.View.Host.ProtocolHosts;
 using _1RM.View.Settings;
+using _1RM.View.Settings.General;
 using _1RM.View.Utils;
 using Shawn.Utils.Wpf;
 using Stylet;
@@ -23,6 +24,7 @@ namespace _1RM.View.Host
         public readonly string Token;
         public new TabWindowView View { get; private set; }
         public SettingsPageViewModel SettingsPage => IoC.Get<SettingsPageViewModel>();
+        private readonly GeneralSettingViewModel _generalSettings;
 
         private IntPtr _hWndTabContent = IntPtr.Zero;
         private readonly Timer _timer_ObserveTabSwitching = new Timer(5);
@@ -39,6 +41,9 @@ namespace _1RM.View.Host
         public TabWindowViewModel(TabWindowView windowView)
         {
             View = windowView;
+            _generalSettings = IoC.Get<GeneralSettingViewModel>();
+            PropertyChangedEventManager.AddHandler(_generalSettings, OnWindowTitleSettingChanged,
+                nameof(GeneralSettingViewModel.TabWindowShowWindowTitle));
             Token = DateTime.Now.Ticks.ToString();
             Items.CollectionChanged += ItemsOnCollectionChanged;
             InitTabSwitchingTimer();
@@ -65,6 +70,8 @@ namespace _1RM.View.Host
 
         public void Dispose()
         {
+            PropertyChangedEventManager.RemoveHandler(_generalSettings, OnWindowTitleSettingChanged,
+                nameof(GeneralSettingViewModel.TabWindowShowWindowTitle));
             _timer_ObserveTabSwitching.Elapsed -= _awaitTabSwitchingHandler;
             _timer_ObserveTabSwitching.Stop();
             _timer_ObserveTabSwitching.Dispose();
@@ -86,8 +93,19 @@ namespace _1RM.View.Host
         private string _title = "";
         public string Title
         {
-            get => _title;
+            get
+            {
+                var suffix = " - " + Assert.APP_DISPLAY_NAME;
+                return !_generalSettings.TabWindowShowWindowTitle && _title.EndsWith(suffix, StringComparison.Ordinal)
+                    ? _title.Substring(0, _title.Length - suffix.Length)
+                    : _title;
+            }
             set => SetAndNotifyIfChanged(ref _title, value);
+        }
+
+        private void OnWindowTitleSettingChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            Execute.OnUIThread(() => RaisePropertyChanged(nameof(Title)));
         }
 
         public ResizeMode WindowResizeMode

@@ -2,21 +2,26 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Dragablz;
 using Newtonsoft.Json;
 using _1RM;
+using _1RM.Model.Protocol;
 using _1RM.Service;
 using _1RM.Service.Locality;
 using _1RM.View;
 using _1RM.View.Host;
+using _1RM.View.Host.ProtocolHosts;
 using _1RM.View.Settings;
 using _1RM.View.Settings.General;
 
@@ -31,8 +36,46 @@ sealed class MainContext
     public bool ShowSetting => false;
 }
 
+sealed class TitleTestHost : HostBase
+{
+    public TitleTestHost(RDP server) : base(server) { }
+    public override void Conn() { }
+    public override void ReConn() { }
+    public override ProtocolHostType GetProtocolHostType() => ProtocolHostType.Native;
+    public override IntPtr GetHostHwnd() => IntPtr.Zero;
+}
+
 static class Smoke
 {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
+    static string NativeTitle(Window window)
+    {
+        var interop = new WindowInteropHelper(window);
+        if (interop.Handle == IntPtr.Zero)
+        {
+            // Use the normal window initialization path without displaying or activating the test window.
+            window.Opacity = 0;
+            window.ShowActivated = false;
+            window.ShowInTaskbar = false;
+            window.Show();
+            Pump();
+        }
+        var text = new StringBuilder(1024);
+        GetWindowText(interop.Handle, text, text.Capacity);
+        return text.ToString();
+    }
+    static TabItemViewModel Session(string name)
+    {
+        var server = new RDP { DisplayName = name };
+        return new TabItemViewModel(new TitleTestHost(server), name);
+    }
+    static void Select(TabWindowView view, TabItemViewModel session)
+    {
+        view.GetViewModel().Items.Add(session);
+        view.GetViewModel().SelectedItem = session;
+        Pump();
+    }
     static int checks;
     static void Check(bool ok, string name)
     {
@@ -99,15 +142,18 @@ static class Smoke
                 type == typeof(SettingsPageViewModel) ? settings :
                 type == typeof(LocalityService) ? locality : null;
             Check(JsonConvert.DeserializeObject<GeneralConfig>("{}")!.TabWindowShowTitleBar, "older configuration keeps title bar visible");
+            Check(JsonConvert.DeserializeObject<GeneralConfig>("{}")!.TabWindowShowWindowTitle, "older configuration keeps the 1Remote title suffix visible");
             var main = new MainWindowView(null!, locality, cfg) { DataContext = new MainContext { SettingViewModel = settings } };
             Layout(main, 900, 560);
             var toggle = (CheckBox)main.FindName("CbShowSessionTitleBar");
+            var titleToggle = (CheckBox)main.FindName("CbShowSessionWindowTitle");
             Check(toggle.IsChecked == true && !string.IsNullOrEmpty(AutomationProperties.GetName(toggle)), "main title bar contains accessible visibility switch");
             var toolbar = (StackPanel)toggle.Parent;
             int position = toolbar.Children.IndexOf(toggle);
             Check(position > 0 && toolbar.Children[position - 1] is Grid searchGrid && searchGrid.Children.OfType<TextBox>().Any()
-                && toolbar.Children[position + 1] is Grid menuGrid && menuGrid.Children.OfType<CheckBox>().Any(x => x.Name == "CbPopForMenu"),
-                "switch is immediately after search and before menu");
+                && toolbar.Children[position + 1] == titleToggle
+                && toolbar.Children[position + 2] is Grid menuGrid && menuGrid.Children.OfType<CheckBox>().Any(x => x.Name == "CbPopForMenu"),
+                "title bar and window title switches are adjacent between search and menu");
             Check(BindingOperations.GetBinding(toggle, ToggleButton.IsCheckedProperty)!.Mode == BindingMode.TwoWay, "switch uses two-way settings binding");
             var first = new TabWindowView(); var second = new TabWindowView(); Layout(first); Layout(second);
             Check(Tabs(first).IsHeaderPanelVisible && Tabs(second).IsHeaderPanelVisible, "both session windows start with title bars");
@@ -136,7 +182,60 @@ static class Smoke
             Check(!first.InputBindings.OfType<KeyBinding>().Any(x => x.Key == Key.F11 && x.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                 && typeof(TabWindowView).GetMethod("RegisterTitleBarHotkey", BindingFlags.Instance | BindingFlags.NonPublic) == null,
                 "title bar keyboard shortcut and native registration are removed");
-            first.GetViewModel().Dispose(); second.GetViewModel().Dispose(); third.GetViewModel().Dispose();
+            Check(titleToggle.IsChecked == true && !string.IsNullOrEmpty(AutomationProperties.GetName(titleToggle)),
+                "title suffix switch is accessible and enabled by default");
+            Check(BindingOperations.GetBinding(titleToggle, ToggleButton.IsCheckedProperty)!.Mode == BindingMode.TwoWay,
+                "title suffix switch uses two-way settings binding");
+            var code = Session("code"); var database = Session("database");
+            Select(first, code); Select(second, database);
+            Check(NativeTitle(first) == "code - 1Remote" && NativeTitle(second) == "database - 1Remote",
+                "native Windows captions initially contain the selected session names");
+            var fullscreen = (FullScreenWindowView)Activator.CreateInstance(typeof(FullScreenWindowView), true)!;
+            var fullscreenSession = Session("fullscreen");
+            var fullscreenHost = typeof(FullScreenWindowView).GetProperty(nameof(FullScreenWindowView.Host))!;
+            fullscreenHost.SetValue(fullscreen, fullscreenSession.Content); Pump();
+            string fullscreenTitle = fullscreenSession.Content.ProtocolServer.DisplayName + " - "
+                + fullscreenSession.Content.ProtocolServer.SubTitle;
+            Check(NativeTitle(fullscreen) == fullscreenTitle, "fullscreen host initially exposes its original system caption");
+            Click(titleToggle);
+            Check(first.Title == "code" && second.Title == "database" && NativeTitle(first) == "code" && NativeTitle(second) == "database",
+                "title suffix switch changes code - 1Remote to code and preserves session names in all tab windows");
+            Check(fullscreen.Title == fullscreenTitle && NativeTitle(fullscreen) == fullscreenTitle,
+                "title suffix switch preserves the fullscreen caption without an automatic 1Remote suffix");
+            Check(!general.TabWindowShowTitleBar && !Tabs(first).IsHeaderPanelVisible,
+                "title suffix switch leaves the independent title bar preference intact");
+            Check(!Configuration.Load(AppPathHelper.Instance.ProfileJsonPath)!.General.TabWindowShowWindowTitle,
+                "hidden title suffix preference persists to disk");
+            Check((string)titleToggle.ToolTip == "显示标题中的 1Remote 后缀", "hidden suffix tooltip describes restoring the 1Remote suffix");
+            code.Content.ProtocolServer.DisplayName = "renamed"; Pump();
+            Check(code.DisplayName == "renamed" && NativeTitle(first) == "renamed",
+                "renaming a session updates its native caption while the suffix stays hidden");
+            var switched = Session("switched"); Select(first, switched);
+            Check(NativeTitle(first) == "switched", "switching tabs preserves the selected session name with the suffix hidden");
+            var fourth = new TabWindowView(); Select(fourth, Session("new session"));
+            Check(fourth.Title == "new session" && NativeTitle(fourth) == "new session", "new windows retain session names with the suffix hidden");
+            Select(third, Session("custom - 1Remote"));
+            Check(NativeTitle(third) == "custom - 1Remote", "hiding removes only the appended suffix and preserves matching text in the session name");
+            Layout(main, 900, 560); Preview(main, "window-title-hidden.png");
+            Click(titleToggle);
+            Check(NativeTitle(first) == "switched - 1Remote" && NativeTitle(second) == "database - 1Remote"
+                && NativeTitle(fourth) == "new session - 1Remote" && NativeTitle(third) == "custom - 1Remote - 1Remote",
+                "restoring the suffix uses each window's latest selected session and preserves its full name");
+            first.GetViewModel().SelectedItem = code; Pump();
+            Check(NativeTitle(first) == "renamed - 1Remote", "restoring retains session renames made while hidden");
+            Check(NativeTitle(fullscreen) == fullscreenTitle, "restoring the suffix leaves the original fullscreen caption intact");
+            Check((string)titleToggle.ToolTip == "隐藏标题中的 1Remote 后缀", "visible suffix tooltip describes hiding the 1Remote suffix");
+            Check(Configuration.Load(AppPathHelper.Instance.ProfileJsonPath)!.General.TabWindowShowWindowTitle,
+                "restored title suffix preference persists to disk");
+            Click(toggle); Pump();
+            Check(NativeTitle(first) == "renamed - 1Remote" && general.TabWindowShowWindowTitle,
+                "the original title bar switch leaves the title suffix preference unchanged");
+            general.TabWindowShowWindowTitle = false; Pump();
+            Check(titleToggle.IsChecked == false && NativeTitle(first) == "renamed" && NativeTitle(fullscreen) == fullscreenTitle,
+                "external title suffix setting updates the switch and preserves all session names");
+            Layout(main, 900, 560); Preview(main, "window-title-visible-header.png");
+            fullscreenHost.SetValue(fullscreen, null); fullscreen.Close();
+            first.GetViewModel().Dispose(); second.GetViewModel().Dispose(); third.GetViewModel().Dispose(); fourth.GetViewModel().Dispose();
             Console.WriteLine($"SUCCESS: {checks} checks passed"); return 0;
         }
         catch (Exception e) { Console.Error.WriteLine(e); return 1; }

@@ -158,6 +158,44 @@
                     </CheckBox.Template>
                 </CheckBox>
 
+                <CheckBox x:Name="CbShowSessionWindowTitle" Width="45" Height="35" VerticalAlignment="Top"
+                          IsChecked="{Binding SettingViewModel.GeneralSettingViewModel.TabWindowShowWindowTitle, Mode=TwoWay}"
+                          AutomationProperties.Name="{DynamicResource 'Show session window titles'}">
+                    <CheckBox.Style>
+                        <Style TargetType="CheckBox">
+                            <Setter Property="ToolTip" Value="{DynamicResource 'Show session window titles'}" />
+                            <Style.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter Property="ToolTip" Value="{DynamicResource 'Hide session window titles'}" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </CheckBox.Style>
+                    <CheckBox.Template>
+                        <ControlTemplate TargetType="CheckBox">
+                            <Border x:Name="BG" Background="{DynamicResource PrimaryMidBrush}">
+                                <Grid Width="16" Height="14" Opacity="0.8">
+                                    <Rectangle Margin="0.75" RadiusX="1" RadiusY="1" StrokeThickness="1.25"
+                                               Stroke="{DynamicResource PrimaryTextBrush}" />
+                                    <Path Data="M 4,4 L 12,4 M 8,4 L 8,10 M 5,10 L 11,10" StrokeThickness="1.25"
+                                          Stroke="{DynamicResource PrimaryTextBrush}" />
+                                    <Path x:Name="HiddenIndicator" Data="M 1,14 L 15,0" StrokeThickness="1.5"
+                                          Stroke="{DynamicResource PrimaryTextBrush}" />
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="BG" Property="Background" Value="{DynamicResource PrimaryDarkBrush}" />
+                                    <Setter TargetName="HiddenIndicator" Property="Visibility" Value="Collapsed" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BG" Property="Background" Value="{DynamicResource PrimaryLightBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </CheckBox.Template>
+                </CheckBox>
+
                 <Grid Width="45" Height="35" Margin="0" VerticalAlignment="Top">
                     <CheckBox Name="CbPopForMenu" Width="45" Height="35" VerticalAlignment="Top" Margin="0">
                         <CheckBox.Template>

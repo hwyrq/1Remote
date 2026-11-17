@@ -2,6 +2,8 @@
     <s:String x:Key="key">en-us</s:String>
     <s:String x:Key="Show title bar in session windows">Show title bar in session windows</s:String>
     <s:String x:Key="Hide title bar in session windows">Hide title bar in session windows</s:String>
+    <s:String x:Key="Show session window titles">Show the 1Remote suffix in window titles</s:String>
+    <s:String x:Key="Hide session window titles">Hide the 1Remote suffix in window titles</s:String>
     <s:String x:Key="language_code-ISO">en-US</s:String>
     <s:String x:Key="language_code-google">en</s:String>
     <s:String x:Key="language_name">English (en-US)</s:String>
